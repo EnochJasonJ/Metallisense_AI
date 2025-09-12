@@ -1,0 +1,12 @@
+venv/
+.venv/
+env/
+.env/
+ENV/
+env.bak/
+venv.bak/
+.conda/
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
