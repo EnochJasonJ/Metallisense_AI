@@ -164,6 +164,7 @@ def get_recommendations(metal_grade: str, adjustments: Dict[str,str]) -> Dict[st
 
             Example recommendation format:  
             {{"Mg": "Add ferromagnesium to increase Mg."}}
+            when giving recommendations instead of giving the same metal name in the recommendation, try to give alloy names. Tell what has to be done instead of telling what could have been done.
             Answer strictly with a single JSON object mapping element symbols to recommendation strings (no wrapper keys).
             """
 
