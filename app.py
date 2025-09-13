@@ -9,12 +9,20 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.multioutput import MultiOutputRegressor
 import xgboost as xgb
 from transformers import pipeline
+from fastapi.middleware.cors import CORSMiddleware
 import requests
 from google import genai
 import ast
 import os
 from dotenv import load_dotenv
 load_dotenv()
+
+origins = [
+    "http://localhost:5173",  # Vite dev server
+    "https://metallisense-ai.onrender.com",  # your deployed frontend (if hosted)
+]
+
+
 
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
@@ -63,6 +71,14 @@ model.fit(X_train_scaled, Y_train)
 
 
 app = FastAPI(title="MetalliSense API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # allow all methods (GET, POST, etc.)
+    allow_headers=["*"],  # allow all headers
+)
 
 class PredictRequest(BaseModel):
     metal_grade: str
