@@ -154,19 +154,48 @@ def get_recommendations(metal_grade: str, adjustments: Dict[str,str]) -> Dict[st
             recs[elem] = ELEMENT_FALLBACK.get(elem, {}).get("add", "No recommendation")
         elif "reduce" in action:
             recs[elem] = ELEMENT_FALLBACK.get(elem, {}).get("reduce", "No recommendation")
+    # Ask LLM for additional precise recommendations, but guard and sanitize the output.
     try:
         prompt = f"""
-        You are a metallurgical expert.
-        Metal grade: {metal_grade}
-        Adjustments: {adjustments}
-        Answer strictly in JSON: {{ "element": "recommendation" }}
-        """
+            You are a metallurgical expert. Provide precise alloy addition recommendations for a given metal grade. Do not include explanations about raw materials, processes, or anything else. Only give clear alloy recommendations in JSON format.
+
+            Metal grade: {metal_grade}  
+            Adjustments: {adjustments}  
+
+            Example recommendation format:  
+            {{"Mg": "Add ferromagnesium to increase Mg."}}
+            Answer strictly with a single JSON object mapping element symbols to recommendation strings (no wrapper keys).
+            """
+
         response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-        parsed = safe_json_parse(re.search(r"\{.*\}", response.text, re.S).group() if response.text else "{}")
+        raw_text = response.text if getattr(response, 'text', None) else ''
+        # extract first JSON-like object from the text
+        m = re.search(r"\{.*\}", raw_text, re.S)
+        parsed = safe_json_parse(m.group() if m else raw_text)
+        # sanitize: only accept dict[str, str] and merge into recs
         if isinstance(parsed, dict):
-            recs.update(parsed)
+            for k, v in parsed.items():
+                # skip any nested structures or wrapper keys
+                if k == 'recommendations':
+                    # if user model returned a nested recommendations dict, flatten it
+                    if isinstance(v, dict):
+                        for kk, vv in v.items():
+                            if isinstance(kk, str) and isinstance(vv, str):
+                                recs[kk] = vv
+                    continue
+                if isinstance(k, str) and isinstance(v, str):
+                    recs[k] = v
     except Exception as e:
+        # Don't fail the API if the LLM call fails; just return fallback recs
         print("Gemini API error:", e)
+    # final sanitize: ensure all values are strings
+    sanitized = {}
+    for k, v in recs.items():
+        try:
+            sanitized[str(k)] = str(v)
+        except Exception:
+            sanitized[str(k)] = ""
+    return sanitized
     return recs
 
 @app.post("/predict", response_model=PredictResponse)
